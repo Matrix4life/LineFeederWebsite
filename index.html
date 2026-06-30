@@ -1,0 +1,1320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LineFeeder — Real-Time Warehouse Delivery System</title>
+  <style>
+    :root {
+      --green: #00ff88;
+      --green-dim: #00cc6a;
+      --dark: #0a0e0a;
+      --dark2: #111611;
+      --dark3: #161e16;
+      --card: #1a241a;
+      --card2: #1e2a1e;
+      --border: #2a3d2a;
+      --text: #e8f5e8;
+      --text-muted: #7a9a7a;
+      --yellow: #ffd700;
+      --red: #ff4444;
+      --blue: #4488ff;
+      --purple: #aa88ff;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; }
+    body {
+      background: var(--dark);
+      color: var(--text);
+      font-family: 'Space Mono', 'Courier New', monospace;
+      overflow-x: hidden;
+    }
+
+    /* ── NAV ── */
+    nav {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 200;
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 0 40px; height: 64px;
+      background: rgba(10,14,10,0.9);
+      backdrop-filter: blur(16px);
+      border-bottom: 1px solid var(--border);
+    }
+    .nav-logo { font-size: 1.2rem; font-weight: bold; color: var(--green); letter-spacing: 0.05em; }
+    .nav-logo span { color: var(--text-muted); }
+    .nav-links { display: flex; gap: 28px; list-style: none; }
+    .nav-links a { color: var(--text-muted); text-decoration: none; font-size: 0.75rem; letter-spacing: 0.1em; text-transform: uppercase; transition: color 0.2s; }
+    .nav-links a:hover { color: var(--green); }
+    .nav-cta { background: var(--green); color: var(--dark); padding: 10px 22px; font-family: inherit; font-size: 0.78rem; font-weight: bold; letter-spacing: 0.06em; text-decoration: none; transition: background 0.2s, transform 0.1s; }
+    .nav-cta:hover { background: var(--green-dim); transform: translateY(-1px); }
+
+    /* ── SCROLL REVEAL ── */
+    .reveal { opacity: 0; transform: translateY(28px); transition: opacity 0.6s ease, transform 0.6s ease; }
+    .reveal.visible { opacity: 1; transform: translateY(0); }
+    .reveal-delay-1 { transition-delay: 0.1s; }
+    .reveal-delay-2 { transition-delay: 0.2s; }
+    .reveal-delay-3 { transition-delay: 0.3s; }
+    .reveal-delay-4 { transition-delay: 0.4s; }
+
+    /* ── HERO ── */
+    .hero {
+      min-height: 100vh; display: flex; flex-direction: column;
+      align-items: center; justify-content: center; text-align: center;
+      padding: 100px 24px 80px; position: relative; overflow: hidden;
+    }
+    .hero-canvas { position: absolute; inset: 0; pointer-events: none; }
+    .hero-glow {
+      position: absolute; top: 30%; left: 50%; transform: translateX(-50%);
+      width: 700px; height: 400px;
+      background: radial-gradient(ellipse, rgba(0,255,136,0.10) 0%, transparent 70%);
+      pointer-events: none; animation: glowPulse 4s ease-in-out infinite;
+    }
+    @keyframes glowPulse { 0%,100% { opacity:0.7; } 50% { opacity:1; } }
+    .hero-badge {
+      display: inline-flex; align-items: center; gap: 8px;
+      background: rgba(0,255,136,0.08); border: 1px solid rgba(0,255,136,0.25);
+      color: var(--green); padding: 6px 16px; font-size: 0.7rem;
+      letter-spacing: 0.14em; text-transform: uppercase; margin-bottom: 32px; position: relative;
+    }
+    .badge-dot { width: 7px; height: 7px; background: var(--green); border-radius: 50%; animation: pulse 2s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1;} 50%{opacity:0.3;} }
+    .hero h1 { font-size: clamp(2.6rem, 6.5vw, 5.2rem); font-weight: bold; line-height: 1.07; letter-spacing: -0.02em; margin-bottom: 24px; position: relative; }
+    .hero h1 .accent { color: var(--green); }
+    .hero-sub { font-size: clamp(0.9rem, 1.8vw, 1.1rem); color: var(--text-muted); max-width: 540px; line-height: 1.75; margin-bottom: 48px; position: relative; }
+    .hero-actions { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; position: relative; }
+    .btn-primary { background: var(--green); color: var(--dark); padding: 16px 36px; font-family: inherit; font-size: 0.85rem; font-weight: bold; letter-spacing: 0.06em; text-decoration: none; transition: background 0.2s, transform 0.15s, box-shadow 0.2s; box-shadow: 0 0 30px rgba(0,255,136,0.22); display: inline-block; }
+    .btn-primary:hover { background: var(--green-dim); transform: translateY(-2px); box-shadow: 0 0 50px rgba(0,255,136,0.4); }
+    .btn-secondary { background: transparent; color: var(--text); padding: 16px 36px; font-family: inherit; font-size: 0.85rem; letter-spacing: 0.06em; text-decoration: none; border: 1px solid var(--border); transition: border-color 0.2s, color 0.2s; display: inline-block; }
+    .btn-secondary:hover { border-color: var(--green); color: var(--green); }
+
+    /* ── STATS BAR ── */
+    .stats-bar { background: var(--dark2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 48px 24px; }
+    .stats-inner { max-width: 900px; margin: 0 auto; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px,1fr)); gap: 40px; text-align: center; }
+    .stat-num { font-size: 2.5rem; font-weight: bold; color: var(--green); letter-spacing: -0.02em; }
+    .stat-label { font-size: 0.68rem; color: var(--text-muted); letter-spacing: 0.12em; text-transform: uppercase; margin-top: 6px; }
+
+    /* ── SECTIONS ── */
+    section { padding: 100px 24px; }
+    .section-inner { max-width: 1100px; margin: 0 auto; }
+    .section-tag { font-size: 0.68rem; letter-spacing: 0.2em; text-transform: uppercase; color: var(--green); margin-bottom: 14px; }
+    .section-title { font-size: clamp(1.7rem, 3.5vw, 2.6rem); line-height: 1.15; margin-bottom: 14px; }
+    .section-desc { color: var(--text-muted); font-size: 0.9rem; line-height: 1.75; max-width: 520px; margin-bottom: 56px; }
+
+    /* ════════════════════════════════
+       INTERACTIVE DEMO
+    ════════════════════════════════ */
+    .demo-section { background: var(--dark2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .demo-layout { display: grid; grid-template-columns: 340px 1fr; gap: 32px; }
+    @media(max-width:860px){ .demo-layout { grid-template-columns:1fr; } }
+
+    /* Submit panel */
+    .submit-panel { background: var(--dark3); border: 1px solid var(--border); padding: 28px; }
+    .panel-title { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--green); margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 12px; }
+    .form-group { margin-bottom: 16px; }
+    .form-label { font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--text-muted); display: block; margin-bottom: 6px; }
+    .form-input, .form-select {
+      width: 100%; background: var(--card); border: 1px solid var(--border);
+      color: var(--text); font-family: inherit; font-size: 0.8rem;
+      padding: 10px 12px; outline: none; transition: border-color 0.2s;
+      appearance: none; -webkit-appearance: none;
+    }
+    .form-input:focus, .form-select:focus { border-color: var(--green); }
+    .priority-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .priority-btn {
+      padding: 10px 6px; background: var(--card); border: 1px solid var(--border);
+      color: var(--text-muted); font-family: inherit; font-size: 0.68rem;
+      letter-spacing: 0.08em; text-transform: uppercase; cursor: pointer;
+      transition: all 0.15s; text-align: center;
+    }
+    .priority-btn:hover { border-color: var(--text-muted); color: var(--text); }
+    .priority-btn.active-low { border-color: var(--green); color: var(--green); background: rgba(0,255,136,0.07); }
+    .priority-btn.active-med { border-color: var(--yellow); color: var(--yellow); background: rgba(255,215,0,0.07); }
+    .priority-btn.active-high { border-color: var(--red); color: var(--red); background: rgba(255,68,68,0.07); }
+    .submit-btn {
+      width: 100%; background: var(--green); color: var(--dark);
+      font-family: inherit; font-size: 0.82rem; font-weight: bold;
+      letter-spacing: 0.08em; padding: 14px; border: none; cursor: pointer;
+      transition: background 0.2s, transform 0.1s; margin-top: 8px; text-transform: uppercase;
+    }
+    .submit-btn:hover { background: var(--green-dim); }
+    .submit-btn:active { transform: scale(0.98); }
+    .auto-toggle { display: flex; align-items: center; gap: 10px; margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border); font-size: 0.72rem; color: var(--text-muted); cursor: pointer; }
+    .toggle-switch { width: 38px; height: 20px; background: var(--border); border-radius: 10px; position: relative; flex-shrink: 0; transition: background 0.2s; cursor: pointer; }
+    .toggle-switch.on { background: var(--green); }
+    .toggle-knob { position: absolute; top: 3px; left: 3px; width: 14px; height: 14px; background: var(--dark); border-radius: 50%; transition: transform 0.2s; }
+    .toggle-switch.on .toggle-knob { transform: translateX(18px); }
+
+    /* Pick list */
+    .picklist-panel { display: flex; flex-direction: column; gap: 0; }
+    .picklist-header { display: flex; align-items: center; justify-content: space-between; padding: 12px 0 16px; }
+    .picklist-title { font-size: 0.72rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--green); }
+    .picklist-count { font-size: 0.68rem; color: var(--text-muted); }
+    .autosim-btn { font-family: inherit; font-size: 0.62rem; letter-spacing: 0.08em; text-transform: uppercase; background: transparent; border: 1px solid var(--border); color: var(--text-muted); padding: 4px 10px; border-radius: 4px; cursor: pointer; transition: all 0.2s; white-space: nowrap; }
+    .autosim-btn:hover { border-color: var(--green); color: var(--green); }
+    .autosim-btn.running { border-color: var(--yellow); color: var(--yellow); }
+    .picklist-empty { border: 1px dashed var(--border); padding: 48px; text-align: center; color: var(--text-muted); font-size: 0.78rem; }
+    .request-card {
+      background: var(--card); border: 1px solid var(--border);
+      border-left: 4px solid var(--green); padding: 16px 18px;
+      margin-bottom: 8px; display: flex; align-items: center; gap: 16px;
+      transition: background 0.2s, border-left-color 0.5s, opacity 0.4s, transform 0.4s;
+      animation: slideIn 0.35s ease;
+    }
+    @keyframes slideIn { from { opacity:0; transform: translateX(-16px); } }
+    .request-card.sla-warn { border-left-color: var(--yellow); }
+    .request-card.sla-crit { border-left-color: var(--red); }
+    .request-card.sla-claimed { border-left-color: var(--blue); background: rgba(68,136,255,0.04); }
+    .request-card.sla-pending { border-left-color: var(--yellow); background: rgba(255,204,0,0.04); }
+    .request-card.delivered { opacity: 0; transform: translateX(30px); }
+    .req-info { flex: 1; min-width: 0; }
+    .req-item { font-size: 0.85rem; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .req-meta { font-size: 0.68rem; color: var(--text-muted); margin-top: 4px; }
+    .req-age { font-size: 0.72rem; font-variant-numeric: tabular-nums; flex-shrink: 0; min-width: 48px; text-align: right; }
+    .req-priority { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; padding: 2px 8px; border: 1px solid; flex-shrink: 0; }
+    .req-priority.low { border-color: rgba(0,255,136,0.4); color: var(--green); }
+    .req-priority.med { border-color: rgba(255,215,0,0.4); color: var(--yellow); }
+    .req-priority.high { border-color: rgba(255,68,68,0.4); color: var(--red); }
+    .req-action {
+      background: transparent; border: 1px solid var(--border); color: var(--text-muted);
+      font-family: inherit; font-size: 0.65rem; letter-spacing: 0.08em;
+      text-transform: uppercase; padding: 8px 14px; cursor: pointer;
+      transition: all 0.15s; flex-shrink: 0;
+    }
+    .req-action:hover { border-color: var(--green); color: var(--green); }
+    .req-actions { display: flex; gap: 6px; }
+    .req-action.btn-unclaim { border-color: rgba(255,204,0,0.4); color: var(--yellow); }
+    .req-action.btn-unclaim:hover { background: rgba(255,204,0,0.08); }
+    .req-action.btn-start { border-color: rgba(68,136,255,0.5); color: var(--blue); }
+    .req-action.btn-start:hover { background: rgba(68,136,255,0.1); }
+    .req-action.btn-pending { border-color: var(--border); color: var(--text-muted); cursor: default; opacity: 0.7; }
+    .req-action.btn-pending::before { content: ''; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--yellow); margin-right: 6px; animation: pulse 1s infinite; }
+
+    /* Toast notifications */
+    .toast-container { position: fixed; top: 80px; right: 24px; z-index: 999; display: flex; flex-direction: column; gap: 10px; pointer-events: none; }
+    .toast {
+      background: var(--card2); border: 1px solid var(--border); border-left: 3px solid;
+      padding: 14px 18px; min-width: 280px; max-width: 340px;
+      display: flex; gap: 12px; align-items: flex-start;
+      animation: toastIn 0.3s ease; pointer-events: auto;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+    }
+    .toast.exit { animation: toastOut 0.3s ease forwards; }
+    @keyframes toastIn { from { opacity:0; transform: translateX(20px); } }
+    @keyframes toastOut { to { opacity:0; transform: translateX(20px); } }
+    .toast.success { border-left-color: var(--green); }
+    .toast.warn { border-left-color: var(--yellow); }
+    .toast.error { border-left-color: var(--red); }
+    .toast.info { border-left-color: var(--blue); }
+    .toast-icon { font-size: 1rem; line-height: 1.4; flex-shrink: 0; }
+    .toast-body { flex: 1; }
+    .toast-title { font-size: 0.78rem; font-weight: bold; margin-bottom: 2px; }
+    .toast-msg { font-size: 0.68rem; color: var(--text-muted); }
+
+    /* ── ROLES ── */
+    .roles-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px,1fr)); gap: 2px; }
+    .role-card { background: var(--card); border: 1px solid var(--border); padding: 32px 26px; cursor: pointer; transition: background 0.2s, transform 0.15s; position: relative; overflow: hidden; }
+    .role-card:hover { background: var(--card2); transform: translateY(-3px); }
+    .role-card.active { background: var(--card2); }
+    .role-card::before { content:''; position:absolute; top:0; left:0; right:0; height:3px; }
+    .role-card.room::before { background: var(--blue); }
+    .role-card.warehouse::before { background: var(--green); }
+    .role-card.supervisor::before { background: var(--yellow); }
+    .role-card.admin::before { background: var(--purple); }
+    .role-icon { font-size: 1.8rem; margin-bottom: 14px; }
+    .role-name { font-size: 0.9rem; font-weight: bold; margin-bottom: 10px; }
+    .role-desc { font-size: 0.75rem; color: var(--text-muted); line-height: 1.65; }
+    .role-perms { margin-top: 16px; display: flex; flex-direction: column; gap: 5px; max-height: 0; overflow: hidden; transition: max-height 0.4s ease, opacity 0.3s; opacity: 0; }
+    .role-card.active .role-perms { max-height: 200px; opacity: 1; }
+    .perm { font-size: 0.68rem; color: var(--text-muted); display: flex; align-items: center; gap: 8px; }
+    .perm::before { content: '▶'; color: var(--green); font-size: 0.5rem; }
+    .role-hint { font-size: 0.6rem; color: var(--text-muted); margin-top: 16px; opacity: 0.5; }
+
+    /* ── FLOW ── */
+    .flow-bg { background: var(--dark2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .flow-steps { display: flex; }
+    .flow-step { flex: 1; padding: 36px 28px; border-right: 1px solid var(--border); position: relative; cursor: pointer; transition: background 0.2s; }
+    .flow-step:last-child { border-right: none; }
+    .flow-step:hover { background: rgba(0,255,136,0.03); }
+    .flow-step.active { background: rgba(0,255,136,0.05); }
+    .flow-step.active::after { content:''; position:absolute; bottom:0; left:0; right:0; height:3px; background:var(--green); animation: progressBar 2.5s linear forwards; }
+    @keyframes progressBar { from{width:0;} to{width:100%;} }
+    .step-num { font-size: 3rem; font-weight: bold; color: rgba(0,255,136,0.1); line-height: 1; margin-bottom: 10px; transition: color 0.3s; }
+    .flow-step.active .step-num { color: rgba(0,255,136,0.25); }
+    .step-title { font-size: 0.8rem; font-weight: bold; color: var(--green); letter-spacing: 0.08em; text-transform: uppercase; margin-bottom: 8px; }
+    .step-desc { font-size: 0.73rem; color: var(--text-muted); line-height: 1.65; }
+    @media(max-width:700px){ .flow-steps{flex-direction:column;} .flow-step{border-right:none;border-bottom:1px solid var(--border);} }
+
+    /* ── SLA SECTION ── */
+    .sla-section { background: var(--dark2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .sla-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 56px; align-items: start; }
+    @media(max-width:700px){ .sla-grid{grid-template-columns:1fr;} }
+    .sla-bar-wrap { margin-bottom: 18px; }
+    .sla-bar-label { display: flex; justify-content: space-between; font-size: 0.7rem; margin-bottom: 6px; }
+    .sla-bar-label .name { color: var(--text-muted); }
+    .sla-bar-label .val { color: var(--green); }
+    .sla-track { height: 8px; background: var(--border); position: relative; overflow: hidden; }
+    .sla-fill { position: absolute; top:0; left:0; bottom:0; width:0; transition: width 1.2s cubic-bezier(0.4,0,0.2,1); }
+    .sla-fill.green { background: var(--green); }
+    .sla-fill.yellow { background: var(--yellow); }
+    .sla-fill.red { background: var(--red); }
+    .threshold { display: flex; align-items: center; gap: 12px; font-size: 0.73rem; margin-bottom: 12px; }
+    .threshold-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+    .threshold-label { color: var(--text-muted); flex: 1; }
+    .threshold-value { color: var(--text); }
+
+    /* SLA slider */
+    .sla-simulator { margin-top: 32px; }
+    .sla-sim-title { font-size: 0.68rem; letter-spacing: 0.12em; text-transform: uppercase; color: var(--green); margin-bottom: 14px; }
+    .sla-mock-request { background: var(--dark3); border: 1px solid var(--border); border-left: 4px solid var(--green); padding: 14px 18px; transition: border-left-color 0.6s; }
+    .sla-mock-request.warn { border-left-color: var(--yellow); }
+    .sla-mock-request.crit { border-left-color: var(--red); }
+    .sla-mock-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .sla-mock-item { font-size: 0.82rem; font-weight: bold; }
+    .sla-mock-age { font-size: 0.78rem; font-variant-numeric: tabular-nums; }
+    .sla-mock-status { font-size: 0.65rem; color: var(--text-muted); }
+    .sla-slider-wrap { margin-top: 14px; }
+    .sla-slider { width: 100%; appearance: none; -webkit-appearance: none; height: 4px; background: var(--border); outline: none; }
+    .sla-slider::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; background:var(--green); border-radius:50%; cursor:pointer; }
+    .sla-slider-labels { display: flex; justify-content: space-between; font-size: 0.6rem; color: var(--text-muted); margin-top: 6px; }
+
+    /* ── FEATURES ── */
+    .features-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px,1fr)); gap: 2px; }
+    .feature-card { background: var(--card); border: 1px solid var(--border); padding: 32px 26px; transition: background 0.2s, transform 0.2s; cursor: default; }
+    .feature-card:hover { background: var(--card2); transform: translateY(-2px); }
+    .feature-icon { font-size: 1.5rem; margin-bottom: 14px; }
+    .feature-title { font-size: 0.85rem; font-weight: bold; margin-bottom: 8px; }
+    .feature-desc { font-size: 0.75rem; color: var(--text-muted); line-height: 1.65; }
+    .feature-tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 14px; }
+    .tag { font-size: 0.6rem; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 8px; border: 1px solid var(--border); color: var(--text-muted); }
+    .tag.green { border-color: rgba(0,255,136,0.35); color: var(--green); }
+    .tag.yellow { border-color: rgba(255,215,0,0.35); color: var(--yellow); }
+    .tag.blue { border-color: rgba(68,136,255,0.35); color: var(--blue); }
+    .tag.purple { border-color: rgba(170,136,255,0.35); color: var(--purple); }
+    .tag.red { border-color: rgba(255,68,68,0.35); color: var(--red); }
+
+    /* ── NOTIFICATION DEMO ── */
+    .notif-section { background: var(--dark2); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    .notif-demo-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+    @media(max-width:700px){ .notif-demo-layout{grid-template-columns:1fr;} }
+    .notif-buttons { display: flex; flex-direction: column; gap: 12px; }
+    .notif-trigger-btn {
+      background: var(--card); border: 1px solid var(--border); color: var(--text);
+      font-family: inherit; font-size: 0.75rem; padding: 14px 20px;
+      cursor: pointer; transition: all 0.15s; text-align: left;
+      display: flex; align-items: center; gap: 14px; letter-spacing: 0.03em;
+    }
+    .notif-trigger-btn:hover { border-color: var(--green); background: var(--card2); }
+    .notif-trigger-btn .ntb-icon { font-size: 1.1rem; flex-shrink: 0; }
+    .notif-trigger-btn .ntb-text { flex: 1; }
+    .ntb-label { font-size: 0.6rem; letter-spacing: 0.1em; text-transform: uppercase; opacity: 0.5; }
+    .notif-live-feed { display: flex; flex-direction: column; gap: 8px; min-height: 260px; }
+    .notif-feed-item {
+      background: var(--dark3); border: 1px solid var(--border); border-left: 3px solid;
+      padding: 12px 16px; display: flex; gap: 12px; animation: toastIn 0.3s ease;
+    }
+    .notif-feed-item.success { border-left-color: var(--green); }
+    .notif-feed-item.warn { border-left-color: var(--yellow); }
+    .notif-feed-item.error { border-left-color: var(--red); }
+    .notif-feed-item.info { border-left-color: var(--blue); }
+    .feed-icon { font-size: 0.9rem; line-height: 1.6; }
+    .feed-title { font-size: 0.75rem; font-weight: bold; }
+    .feed-msg { font-size: 0.65rem; color: var(--text-muted); margin-top: 2px; }
+    .feed-time { font-size: 0.6rem; color: var(--text-muted); margin-left: auto; align-self: center; flex-shrink:0; }
+
+    /* ── PWA ── */
+    .pwa-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px,1fr)); gap: 2px; }
+    .pwa-card { background: var(--card); border: 1px solid var(--border); padding: 28px; transition: background 0.2s; }
+    .pwa-card:hover { background: var(--card2); }
+    .pwa-card-icon { font-size: 1.5rem; margin-bottom: 12px; }
+    .pwa-card-title { font-size: 0.82rem; font-weight: bold; margin-bottom: 8px; }
+    .pwa-card-desc { font-size: 0.73rem; color: var(--text-muted); line-height: 1.65; }
+
+    /* ── CTA ── */
+    .cta-section { text-align: center; padding: 120px 24px; position: relative; overflow: hidden; }
+    .cta-glow { position:absolute; bottom:-80px; left:50%; transform:translateX(-50%); width:500px; height:300px; background:radial-gradient(ellipse,rgba(0,255,136,0.08) 0%,transparent 70%); pointer-events:none; }
+    .cta-section h2 { font-size: clamp(1.8rem, 4vw, 3rem); margin-bottom: 20px; }
+    .cta-section p { color: var(--text-muted); font-size: 0.9rem; line-height: 1.75; max-width: 460px; margin: 0 auto 48px; }
+
+    /* ── FOOTER ── */
+    footer { border-top: 1px solid var(--border); padding: 36px 40px; display: flex; justify-content: space-between; align-items: center; font-size: 0.7rem; color: var(--text-muted); flex-wrap: wrap; gap: 12px; }
+    .footer-logo { color: var(--green); font-weight: bold; }
+
+    @media(max-width:700px) {
+      #contact .section-inner > div { grid-template-columns: 1fr !important; gap: 40px !important; }
+      nav .nav-links { display: none; }
+    }
+    ::-webkit-scrollbar { width: 6px; }
+    ::-webkit-scrollbar-track { background: var(--dark); }
+    ::-webkit-scrollbar-thumb { background: var(--border); }
+    ::-webkit-scrollbar-thumb:hover { background: var(--green); }
+  </style>
+</head>
+<body>
+
+<!-- TOAST CONTAINER -->
+<div class="toast-container" id="toastContainer"></div>
+
+<!-- NAV -->
+<nav>
+  <div class="nav-logo">Line<span>Feeder</span></div>
+  <ul class="nav-links">
+    <li><a href="#demo">Try Demo</a></li>
+    <li><a href="#roles">Roles</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#analytics">Analytics</a></li>
+  </ul>
+  <a href="#contact" class="nav-cta">Request a Demo</a>
+</nav>
+
+<!-- HERO (canvas particle background) -->
+<section class="hero">
+  <canvas class="hero-canvas" id="heroCanvas"></canvas>
+  <div class="hero-glow"></div>
+  <div class="hero-badge reveal">
+    <span class="badge-dot"></span>
+    Real-time warehouse coordination
+  </div>
+  <h1 class="reveal reveal-delay-1">Deliver smarter.<br><span class="accent">Warehouse requests</span><br>at the speed of now.</h1>
+  <p class="hero-sub reveal reveal-delay-2">LineFeeder connects your production rooms to your warehouse in real time — with SLA tracking, push notifications, and live dashboards that keep every shift running on time.</p>
+  <div class="hero-actions reveal reveal-delay-3">
+    <a href="#demo" class="btn-primary">Try the Demo</a>
+    <a href="#contact" class="btn-secondary">Request a Demo</a>
+  </div>
+</section>
+
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stats-inner">
+    <div class="reveal"><div class="stat-num" data-target="4">0</div><div class="stat-label">User Roles</div></div>
+    <div class="reveal reveal-delay-1"><div class="stat-num" data-target-text="&lt;3m">&lt;3m</div><div class="stat-label">Target Pick SLA</div></div>
+    <div class="reveal reveal-delay-2"><div class="stat-num" data-target="100">0</div><div class="stat-label">% Real-time Updates</div></div>
+    <div class="reveal reveal-delay-3"><div class="stat-num" data-target="60">0</div><div class="stat-label">Days of AI History</div></div>
+    <div class="reveal reveal-delay-4"><div class="stat-num" data-target-text="PWA">PWA</div><div class="stat-label">Works on Any Device</div></div>
+  </div>
+</div>
+
+<!-- INTERACTIVE DEMO -->
+<section class="demo-section" id="demo">
+  <div class="section-inner">
+    <div class="section-tag reveal">// Interactive Demo</div>
+    <h2 class="section-title reveal reveal-delay-1">Submit a request.<br>Watch it happen live.</h2>
+    <p class="section-desc reveal reveal-delay-2">This is a live simulation of LineFeeder's request board. Submit a request, then claim and deliver it — just like your warehouse team does every shift.</p>
+    <div class="demo-layout reveal reveal-delay-3">
+      <!-- Submit Panel -->
+      <div class="submit-panel">
+        <div class="panel-title">📝 Room Request Form</div>
+        <div class="form-group">
+          <label class="form-label">Room</label>
+          <select class="form-select" id="demoRoom">
+            <option>Bistro</option>
+            <option>Salad Room</option>
+            <option>Hot Kitchen</option>
+            <option>Cold Prep</option>
+            <option>Bakery</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Item Requested</label>
+          <input class="form-input" id="demoItem" type="text" placeholder="e.g. Chicken Breast" value="Chicken Breast" />
+        </div>
+        <div class="form-group" style="display:grid;grid-template-columns:2fr 1fr;gap:10px">
+          <div>
+            <label class="form-label">Quantity</label>
+            <input class="form-input" id="demoQty" type="number" placeholder="5" value="5" min="1" />
+          </div>
+          <div>
+            <label class="form-label">Unit</label>
+            <select class="form-select" id="demoUnit">
+              <option>kg</option>
+              <option>lbs</option>
+              <option>cases</option>
+              <option>pcs</option>
+              <option>bags</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label class="form-label">Priority</label>
+          <div class="priority-row">
+            <button class="priority-btn active-low" onclick="setPriority('low',this)">Low</button>
+            <button class="priority-btn" onclick="setPriority('med',this)">Medium</button>
+            <button class="priority-btn" onclick="setPriority('high',this)">High</button>
+          </div>
+        </div>
+        <button class="submit-btn" onclick="submitRequest()">→ Submit Request</button>
+        <div class="auto-toggle" onclick="toggleAuto()">
+          <div class="toggle-switch" id="autoToggle"><div class="toggle-knob"></div></div>
+          <span>Auto-generate requests</span>
+        </div>
+      </div>
+      <!-- Pick List -->
+      <div class="picklist-panel">
+        <div class="picklist-header">
+          <div class="picklist-title">📦 Live Pick List</div>
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div class="picklist-count" id="picklistCount">0 open requests</div>
+            <button id="autoSimBtn" onclick="toggleAutoSim()" class="autosim-btn">▶ Watch Demo</button>
+          </div>
+        </div>
+        <div id="picklistEmpty" class="picklist-empty">No requests yet — submit one to get started.</div>
+        <div id="picklistCards"></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ROLES -->
+<section id="roles">
+  <div class="section-inner">
+    <div class="section-tag reveal">// Access Control</div>
+    <h2 class="section-title reveal reveal-delay-1">Built for every role on your team.</h2>
+    <p class="section-desc reveal reveal-delay-2">Click a role to see what each user can do.</p>
+    <div class="roles-grid">
+      <div class="role-card room reveal" onclick="toggleRole(this)">
+        <div class="role-icon">🏭</div>
+        <div class="role-name">Production Room</div>
+        <div class="role-desc">Submit ingredient requests, track delivery status in real time, and receive instant notifications when deliveries arrive or are cancelled.</div>
+        <div class="role-perms">
+          <div class="perm">Create & cancel requests</div>
+          <div class="perm">Set priority levels</div>
+          <div class="perm">Real-time status board</div>
+          <div class="perm">In-app & push notifications</div>
+          <div class="perm">Chat with warehouse</div>
+        </div>
+        <div class="role-hint">Click to expand</div>
+      </div>
+      <div class="role-card warehouse reveal reveal-delay-1" onclick="toggleRole(this)">
+        <div class="role-icon">📦</div>
+        <div class="role-name">Warehouse</div>
+        <div class="role-desc">Manage and fulfill incoming requests from a clear pick list. Claim, start, and complete jobs with full timestamp tracking.</div>
+        <div class="role-perms">
+          <div class="perm">Live pick list view</div>
+          <div class="perm">Claim & deliver workflow</div>
+          <div class="perm">Break time tracking</div>
+          <div class="perm">SLA status visibility</div>
+          <div class="perm">Chat with rooms</div>
+        </div>
+        <div class="role-hint">Click to expand</div>
+      </div>
+      <div class="role-card supervisor reveal reveal-delay-2" onclick="toggleRole(this)">
+        <div class="role-icon">📊</div>
+        <div class="role-name">Supervisor</div>
+        <div class="role-desc">Monitor team performance through customizable dashboards, assign staff to rooms or 5S zones, and generate AI-powered prep lists.</div>
+        <div class="role-perms">
+          <div class="perm">Drag-and-drop dashboards</div>
+          <div class="perm">Worker zone assignments</div>
+          <div class="perm">5S audit program</div>
+          <div class="perm">AI prep list generation</div>
+          <div class="perm">FIFO OOR analyzer</div>
+        </div>
+        <div class="role-hint">Click to expand</div>
+      </div>
+      <div class="role-card admin reveal reveal-delay-3" onclick="toggleRole(this)">
+        <div class="role-icon">⚙️</div>
+        <div class="role-name">Admin</div>
+        <div class="role-desc">Full system control — manage users, configure SLA thresholds, upload custom audio, monitor all conversations, and oversee every shift.</div>
+        <div class="role-perms">
+          <div class="perm">User & shift management</div>
+          <div class="perm">SLA threshold config</div>
+          <div class="perm">Custom audio upload</div>
+          <div class="perm">All conversation monitoring</div>
+          <div class="perm">System-wide settings</div>
+        </div>
+        <div class="role-hint">Click to expand</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- REQUEST FLOW (auto-cycle) -->
+<section class="flow-bg" id="flow">
+  <div class="section-inner">
+    <div class="section-tag reveal">// Request Lifecycle</div>
+    <h2 class="section-title reveal reveal-delay-1" style="margin-bottom:40px">From request to delivery in four steps.</h2>
+    <div class="flow-steps" id="flowSteps">
+      <div class="flow-step active" data-step="0">
+        <div class="step-num">01</div>
+        <div class="step-title">Submit</div>
+        <div class="step-desc">Room staff specify item, quantity, unit, and priority. Requests appear on the warehouse board instantly via real-time sync.</div>
+      </div>
+      <div class="flow-step" data-step="1">
+        <div class="step-num">02</div>
+        <div class="step-title">Claim</div>
+        <div class="step-desc">Warehouse staff claim open requests from the live pick list. SLA color codes highlight jobs aging toward breach thresholds.</div>
+      </div>
+      <div class="flow-step" data-step="2">
+        <div class="step-num">03</div>
+        <div class="step-title">Deliver</div>
+        <div class="step-desc">Once delivered, staff mark complete. Total wait time and pick time are automatically recorded for performance analytics.</div>
+      </div>
+      <div class="flow-step" data-step="3">
+        <div class="step-num">04</div>
+        <div class="step-title">Track</div>
+        <div class="step-desc">Every request feeds live dashboards, SLA compliance metrics, and historical reports — full visibility every shift.</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="section-inner">
+    <div class="section-tag reveal">// Platform Capabilities</div>
+    <h2 class="section-title reveal reveal-delay-1">Everything your warehouse needs.</h2>
+    <p class="section-desc reveal reveal-delay-2">A complete toolset for modern food production — built for mobile, designed for speed.</p>
+    <div class="features-grid">
+      <div class="feature-card reveal"><div class="feature-icon">⚡</div><div class="feature-title">Real-Time Sync</div><div class="feature-desc">Powered by Supabase Postgres Changes. Every update propagates to all devices in milliseconds — no polling, no refresh needed.</div><div class="feature-tags"><span class="tag green">Live</span><span class="tag">Supabase</span><span class="tag">WebSocket</span></div></div>
+      <div class="feature-card reveal reveal-delay-1"><div class="feature-icon">🔔</div><div class="feature-title">Multi-Channel Notifications</div><div class="feature-desc">In-app toasts, native browser notifications, and OneSignal push (including iOS PWA). Audio cues and haptic vibration for every event type.</div><div class="feature-tags"><span class="tag blue">Push</span><span class="tag">OneSignal</span><span class="tag">iOS</span></div></div>
+      <div class="feature-card reveal reveal-delay-2"><div class="feature-icon">💬</div><div class="feature-title">Built-In Messaging</div><div class="feature-desc">Real-time chat between users and roles with unread badges. Admin monitoring gives full visibility into all conversations across the shift.</div><div class="feature-tags"><span class="tag green">Real-time</span><span class="tag purple">Admin Monitor</span></div></div>
+      <div class="feature-card reveal"><div class="feature-icon">🤖</div><div class="feature-title">AI Prep List Generator</div><div class="feature-desc">Analyzes 60 days of historical data to generate shift-specific prep lists. Generated items convert directly into warehouse requests with one tap.</div><div class="feature-tags"><span class="tag purple">AI-Powered</span><span class="tag">60-Day History</span></div></div>
+      <div class="feature-card reveal reveal-delay-1"><div class="feature-icon">🏷️</div><div class="feature-title">5S Audit Program</div><div class="feature-desc">Structured audits across warehouse zones with photo evidence and fix photos upon resolution. Scores feed the analytics dashboard automatically.</div><div class="feature-tags"><span class="tag yellow">5S</span><span class="tag">Photo Evidence</span><span class="tag">Zones</span></div></div>
+      <div class="feature-card reveal reveal-delay-2"><div class="feature-icon">📈</div><div class="feature-title">FIFO / OOR Analyzer</div><div class="feature-desc">Upload inventory CSVs to detect Out-of-Rotation items — stock picked out of first-in-first-out sequence. Keeps compliance tight across all zones.</div><div class="feature-tags"><span class="tag red">FIFO</span><span class="tag">CSV Import</span><span class="tag">Compliance</span></div></div>
+      <div class="feature-card reveal"><div class="feature-icon">🎵</div><div class="feature-title">Custom Audio Alerts</div><div class="feature-desc">Admins upload custom audio files per notification type. Fallback to Web Audio API oscillator tones ensures alerts always fire with no silent failures.</div><div class="feature-tags"><span class="tag">Web Audio API</span><span class="tag">Custom Upload</span></div></div>
+      <div class="feature-card reveal reveal-delay-1"><div class="feature-icon">📤</div><div class="feature-title">Export & Reporting</div><div class="feature-desc">Export request archives, OOR reports, and 5S audit history in CSV or PDF. All completed requests permanently archived with full timestamps.</div><div class="feature-tags"><span class="tag">CSV</span><span class="tag">PDF</span><span class="tag green">Archive</span></div></div>
+      <div class="feature-card reveal reveal-delay-2"><div class="feature-icon">📅</div><div class="feature-title">Staff Assignments</div><div class="feature-desc">Schedule workers to specific rooms or 5S zones by Day, Week, Month, or Year. Always reflected on the live supervisor dashboard in real time.</div><div class="feature-tags"><span class="tag yellow">Scheduling</span><span class="tag">Zone-Based</span></div></div>
+    </div>
+  </div>
+</section>
+
+<!-- SLA ANALYTICS (interactive) -->
+<section class="sla-section" id="analytics">
+  <div class="section-inner">
+    <div class="section-tag reveal">// SLA Intelligence</div>
+    <h2 class="section-title reveal reveal-delay-1">Know your SLA status before it's too late.</h2>
+    <p class="section-desc reveal reveal-delay-2">Configurable thresholds give every request a live urgency score. Drag the slider below to simulate a request aging through SLA stages.</p>
+    <div class="sla-grid">
+      <div class="reveal">
+        <div class="sla-bar-wrap"><div class="sla-bar-label"><span class="name">Bistro Room</span><span class="val">92% under SLA</span></div><div class="sla-track"><div class="sla-fill green" id="sla1"></div></div></div>
+        <div class="sla-bar-wrap"><div class="sla-bar-label"><span class="name">Salad Room</span><span class="val">84% under SLA</span></div><div class="sla-track"><div class="sla-fill green" id="sla2"></div></div></div>
+        <div class="sla-bar-wrap"><div class="sla-bar-label"><span class="name">Hot Kitchen</span><span class="val">71% under SLA</span></div><div class="sla-track"><div class="sla-fill yellow" id="sla3"></div></div></div>
+        <div class="sla-bar-wrap"><div class="sla-bar-label"><span class="name">Cold Prep</span><span class="val">55% under SLA</span></div><div class="sla-track"><div class="sla-fill red" id="sla4"></div></div></div>
+        <br/>
+        <div class="threshold"><div class="threshold-dot" style="background:var(--green)"></div><div class="threshold-label">On Track — under warning</div><div class="threshold-value">&lt;5 min</div></div>
+        <div class="threshold"><div class="threshold-dot" style="background:var(--yellow)"></div><div class="threshold-label">Warning — approaching breach</div><div class="threshold-value">5–10 min</div></div>
+        <div class="threshold"><div class="threshold-dot" style="background:var(--red)"></div><div class="threshold-label">Critical — SLA breached</div><div class="threshold-value">&gt;10 min</div></div>
+      </div>
+      <div class="reveal reveal-delay-2">
+        <div class="sla-simulator">
+          <div class="sla-sim-title">⏱ SLA Simulator — drag to age a request</div>
+          <div class="sla-mock-request" id="slaMockCard">
+            <div class="sla-mock-top">
+              <div class="sla-mock-item">Chicken Breast — Bistro</div>
+              <div class="sla-mock-age" id="slaMockAge" style="color:var(--green)">0m 00s</div>
+            </div>
+            <div class="sla-mock-status" id="slaMockStatus">✓ On track — well within SLA</div>
+          </div>
+          <div class="sla-slider-wrap">
+            <input class="sla-slider" type="range" min="0" max="1200" value="0" id="slaSlider" oninput="updateSLAMock(this.value)">
+            <div class="sla-slider-labels"><span>0 min</span><span>5 min</span><span>10 min</span><span>20 min</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- NOTIFICATION DEMO -->
+<section class="notif-section" id="notifications">
+  <div class="section-inner">
+    <div class="section-tag reveal">// Notification System</div>
+    <h2 class="section-title reveal reveal-delay-1">Never miss a beat.</h2>
+    <p class="section-desc reveal reveal-delay-2">Click any event type below to fire a live notification — exactly what your team sees on shift.</p>
+    <div class="notif-demo-layout">
+      <div class="notif-buttons reveal">
+        <button class="notif-trigger-btn" onclick="fireNotif('success','✅','Delivery Confirmed','Bistro Room — 5kg Chicken Breast delivered by J. Martinez')">
+          <span class="ntb-icon">✅</span>
+          <span class="ntb-text"><div>Delivery Confirmed</div><div class="ntb-label">Tap to trigger</div></span>
+        </button>
+        <button class="notif-trigger-btn" onclick="fireNotif('warn','⚠️','SLA Warning','Hot Kitchen request has been waiting 8 minutes')">
+          <span class="ntb-icon">⚠️</span>
+          <span class="ntb-text"><div>SLA Warning</div><div class="ntb-label">Tap to trigger</div></span>
+        </button>
+        <button class="notif-trigger-btn" onclick="fireNotif('error','🚨','High Priority Request','Salad Room — URGENT: 3 cases Mixed Greens needed immediately')">
+          <span class="ntb-icon">🚨</span>
+          <span class="ntb-text"><div>High Priority Alert</div><div class="ntb-label">Tap to trigger</div></span>
+        </button>
+        <button class="notif-trigger-btn" onclick="fireNotif('info','❌','Request Cancelled','Cold Prep — Cream Cheese cancelled: Out of stock until tomorrow')">
+          <span class="ntb-icon">❌</span>
+          <span class="ntb-text"><div>Request Cancelled</div><div class="ntb-label">Tap to trigger</div></span>
+        </button>
+        <button class="notif-trigger-btn" onclick="fireNotif('info','💬','New Message','Warehouse → Bistro: Running 5 minutes behind, on my way')">
+          <span class="ntb-icon">💬</span>
+          <span class="ntb-text"><div>Chat Message</div><div class="ntb-label">Tap to trigger</div></span>
+        </button>
+      </div>
+      <div class="reveal reveal-delay-2">
+        <div style="font-size:0.65rem;color:var(--text-muted);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:12px;">Live notification feed</div>
+        <div class="notif-live-feed" id="notifFeed">
+          <div style="padding:32px;text-align:center;color:var(--text-muted);font-size:0.75rem;border:1px dashed var(--border)">Tap an event type on the left to fire a notification.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- PWA -->
+<section id="pwa">
+  <div class="section-inner">
+    <div class="section-tag reveal">// Progressive Web App</div>
+    <h2 class="section-title reveal reveal-delay-1">Runs anywhere. Installs everywhere.</h2>
+    <p class="section-desc reveal reveal-delay-2">LineFeeder is a full PWA — installable on any device with native-app performance and offline resilience built in.</p>
+    <div class="pwa-cards">
+      <div class="pwa-card reveal"><div class="pwa-card-icon">📱</div><div class="pwa-card-title">Install on Any Device</div><div class="pwa-card-desc">Add to home screen on iOS, Android, or desktop. Runs full-screen with no browser chrome — feels completely native.</div></div>
+      <div class="pwa-card reveal reveal-delay-1"><div class="pwa-card-icon">🔌</div><div class="pwa-card-title">Offline Resilience</div><div class="pwa-card-desc">Service Worker caches all app shell assets. Loads instantly even when network connectivity drops on the warehouse floor.</div></div>
+      <div class="pwa-card reveal reveal-delay-2"><div class="pwa-card-icon">🔔</div><div class="pwa-card-title">Push Notifications</div><div class="pwa-card-desc">Receive push alerts even when the app is closed — including iOS native push via OneSignal when installed as a PWA.</div></div>
+      <div class="pwa-card reveal reveal-delay-3"><div class="pwa-card-icon">🔄</div><div class="pwa-card-title">Auto Updates</div><div class="pwa-card-desc">When a new version deploys, a banner prompts users to refresh — ensuring everyone always runs the latest release.</div></div>
+    </div>
+  </div>
+</section>
+
+
+<!-- CTA -->
+<section class="cta-section">
+  <div class="cta-glow"></div>
+  <div class="section-tag reveal">// See it in action</div>
+  <h2 class="reveal reveal-delay-1">Your warehouse.<br><span style="color:var(--green)">Fully coordinated.</span></h2>
+  <p class="reveal reveal-delay-2">See how LineFeeder transforms shift coordination at your facility. Get a personalized walkthrough with your team's specific workflow in mind.</p>
+  <div class="hero-actions reveal reveal-delay-3">
+    <a href="#contact" class="btn-primary">Request a Demo</a>
+  </div>
+</section>
+
+<!-- CONTACT / DEMO REQUEST -->
+<section id="contact" style="background:var(--dark2);border-top:1px solid var(--border);">
+  <div class="section-inner">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:64px;align-items:start;">
+      <div>
+        <div class="section-tag reveal">// Get in Touch</div>
+        <h2 class="section-title reveal reveal-delay-1">Ready to see LineFeeder at your facility?</h2>
+        <p style="color:var(--text-muted);font-size:0.88rem;line-height:1.75;margin-bottom:36px;" class="reveal reveal-delay-2">Tell us about your operation and we'll set up a personalized demo tailored to your production environment.</p>
+        <div style="display:flex;flex-direction:column;gap:20px;" class="reveal reveal-delay-3">
+          <div style="display:flex;align-items:flex-start;gap:16px;">
+            <div style="font-size:1.3rem;margin-top:2px;">⚡</div>
+            <div>
+              <div style="font-size:0.82rem;font-weight:bold;margin-bottom:4px;">Real-time coordination</div>
+              <div style="font-size:0.73rem;color:var(--text-muted);line-height:1.6;">Requests, SLA tracking, and notifications — all live, no refresh needed.</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:16px;">
+            <div style="font-size:1.3rem;margin-top:2px;">📱</div>
+            <div>
+              <div style="font-size:0.82rem;font-weight:bold;margin-bottom:4px;">Works on any device</div>
+              <div style="font-size:0.73rem;color:var(--text-muted);line-height:1.6;">Installable PWA — phones, tablets, or desktops on the warehouse floor.</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:flex-start;gap:16px;">
+            <div style="font-size:1.3rem;margin-top:2px;">🚀</div>
+            <div>
+              <div style="font-size:0.82rem;font-weight:bold;margin-bottom:4px;">Fast to deploy</div>
+              <div style="font-size:0.73rem;color:var(--text-muted);line-height:1.6;">No hardware required. Your team can be up and running the same day.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="reveal reveal-delay-2">
+        <div style="background:var(--dark3);border:1px solid var(--border);padding:36px;" id="contactForm">
+          <div style="font-size:0.7rem;letter-spacing:0.14em;text-transform:uppercase;color:var(--green);margin-bottom:24px;border-bottom:1px solid var(--border);padding-bottom:14px;">📋 Request a Demo</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px;">
+            <div>
+              <label class="form-label">First Name</label>
+              <input class="form-input" type="text" placeholder="Jane" id="cfFirst" />
+            </div>
+            <div>
+              <label class="form-label">Last Name</label>
+              <input class="form-input" type="text" placeholder="Smith" id="cfLast" />
+            </div>
+          </div>
+          <div style="margin-bottom:16px;">
+            <label class="form-label">Work Email</label>
+            <input class="form-input" type="email" placeholder="jane@yourcompany.com" id="cfEmail" />
+          </div>
+          <div style="margin-bottom:16px;">
+            <label class="form-label">Company / Facility Name</label>
+            <input class="form-input" type="text" placeholder="Acme Foods Inc." id="cfCompany" />
+          </div>
+          <div style="margin-bottom:16px;">
+            <label class="form-label">Team Size</label>
+            <select class="form-select" id="cfSize">
+              <option value="">Select...</option>
+              <option>1–10 staff</option>
+              <option>11–50 staff</option>
+              <option>51–200 staff</option>
+              <option>200+ staff</option>
+            </select>
+          </div>
+          <div style="margin-bottom:24px;">
+            <label class="form-label">Tell us about your operation</label>
+            <textarea class="form-input" rows="3" placeholder="e.g. Multi-room food production facility, 3 shifts per day..." id="cfNotes" style="resize:vertical;"></textarea>
+          </div>
+          <button class="submit-btn" onclick="submitContact()" id="cfBtn">→ Request Demo</button>
+        </div>
+        <div id="contactSuccess" style="display:none;background:var(--dark3);border:1px solid var(--border);border-left:4px solid var(--green);padding:48px 36px;text-align:center;">
+          <div style="font-size:2rem;margin-bottom:16px;">✅</div>
+          <div style="font-size:0.95rem;font-weight:bold;margin-bottom:10px;">Request received!</div>
+          <div style="font-size:0.78rem;color:var(--text-muted);line-height:1.7;">Thanks for your interest in LineFeeder. We'll be in touch shortly to schedule your personalized demo.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer>
+  <div class="footer-logo">LineFeeder</div>
+  <div>Real-Time Warehouse Delivery Coordination System</div>
+  <div>Built for food production environments</div>
+</footer>
+
+<script>
+/* ════════════════════════════════════════
+   HERO CANVAS — particle network
+════════════════════════════════════════ */
+(function() {
+  const canvas = document.getElementById('heroCanvas');
+  const ctx = canvas.getContext('2d');
+  let W, H, particles = [], animId;
+
+  function resize() {
+    W = canvas.width = canvas.offsetWidth;
+    H = canvas.height = canvas.offsetHeight;
+  }
+
+  function Particle() {
+    this.x = Math.random() * W;
+    this.y = Math.random() * H;
+    this.vx = (Math.random() - 0.5) * 0.4;
+    this.vy = (Math.random() - 0.5) * 0.4;
+    this.r = Math.random() * 1.5 + 0.5;
+  }
+
+  function init() {
+    resize();
+    particles = Array.from({ length: 80 }, () => new Particle());
+  }
+
+  function draw() {
+    ctx.clearRect(0, 0, W, H);
+    particles.forEach(p => {
+      p.x += p.vx; p.y += p.vy;
+      if (p.x < 0) p.x = W; if (p.x > W) p.x = 0;
+      if (p.y < 0) p.y = H; if (p.y > H) p.y = 0;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+      ctx.fillStyle = 'rgba(0,255,136,0.35)';
+      ctx.fill();
+    });
+    for (let i = 0; i < particles.length; i++) {
+      for (let j = i + 1; j < particles.length; j++) {
+        const dx = particles[i].x - particles[j].x;
+        const dy = particles[i].y - particles[j].y;
+        const dist = Math.sqrt(dx*dx + dy*dy);
+        if (dist < 100) {
+          ctx.beginPath();
+          ctx.moveTo(particles[i].x, particles[i].y);
+          ctx.lineTo(particles[j].x, particles[j].y);
+          ctx.strokeStyle = `rgba(0,255,136,${0.08 * (1 - dist/100)})`;
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+      }
+    }
+    animId = requestAnimationFrame(draw);
+  }
+
+  window.addEventListener('resize', () => { resize(); });
+  init(); draw();
+})();
+
+/* ════════════════════════════════════════
+   SCROLL REVEAL
+════════════════════════════════════════ */
+// If page loaded with a hash, pre-reveal ALL elements in that section immediately
+// so content is never hidden when navigating directly to a section
+if (window.location.hash) {
+  try {
+    const target = document.querySelector(window.location.hash);
+    if (target) target.querySelectorAll('.reveal').forEach(el => el.classList.add('visible'));
+  } catch(e) {}
+}
+
+const revealObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) { e.target.classList.add('visible'); } });
+}, { threshold: 0.05, rootMargin: '0px 0px 60px 0px' });
+document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+function revealInView() {
+  document.querySelectorAll('.reveal:not(.visible)').forEach(el => {
+    const rect = el.getBoundingClientRect();
+    if (rect.top < window.innerHeight + 100 && rect.bottom > -100) el.classList.add('visible');
+  });
+}
+revealInView();
+setTimeout(revealInView, 120);
+setTimeout(revealInView, 400);
+window.addEventListener('scroll', revealInView, { passive: true });
+window.addEventListener('hashchange', () => {
+  try {
+    const target = document.querySelector(window.location.hash);
+    if (target) target.querySelectorAll('.reveal').forEach(el => el.classList.add('visible'));
+  } catch(e) {}
+});
+
+/* ════════════════════════════════════════
+   COUNTER ANIMATION
+════════════════════════════════════════ */
+const counterObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting && e.target.dataset.target) {
+      const target = parseInt(e.target.dataset.target);
+      let start = 0;
+      const step = target / 40;
+      const timer = setInterval(() => {
+        start += step;
+        if (start >= target) { start = target; clearInterval(timer); }
+        e.target.textContent = Math.floor(start) + (e.target.dataset.suffix || '');
+      }, 30);
+      counterObserver.unobserve(e.target);
+    }
+  });
+}, { threshold: 0.5 });
+document.querySelectorAll('[data-target]').forEach(el => counterObserver.observe(el));
+
+/* ════════════════════════════════════════
+   SLA BAR ANIMATION
+════════════════════════════════════════ */
+const slaObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) {
+      setTimeout(() => { document.getElementById('sla1').style.width = '92%'; }, 100);
+      setTimeout(() => { document.getElementById('sla2').style.width = '84%'; }, 200);
+      setTimeout(() => { document.getElementById('sla3').style.width = '71%'; }, 300);
+      setTimeout(() => { document.getElementById('sla4').style.width = '55%'; }, 400);
+      slaObserver.disconnect();
+    }
+  });
+}, { threshold: 0.3 });
+slaObserver.observe(document.getElementById('sla1'));
+
+/* ════════════════════════════════════════
+   TOAST NOTIFICATIONS
+════════════════════════════════════════ */
+function showToast(type, icon, title, msg) {
+  const container = document.getElementById('toastContainer');
+  const toast = document.createElement('div');
+  toast.className = `toast ${type}`;
+  toast.innerHTML = `<div class="toast-icon">${icon}</div><div class="toast-body"><div class="toast-title">${title}</div><div class="toast-msg">${msg}</div></div>`;
+  container.appendChild(toast);
+  setTimeout(() => {
+    toast.classList.add('exit');
+    setTimeout(() => toast.remove(), 300);
+  }, 3800);
+}
+
+/* ════════════════════════════════════════
+   NOTIFICATION FEED
+════════════════════════════════════════ */
+function fireNotif(type, icon, title, msg) {
+  showToast(type, icon, title, msg);
+  const feed = document.getElementById('notifFeed');
+  const placeholder = feed.querySelector('div[style]');
+  if (placeholder) placeholder.remove();
+  const now = new Date();
+  const timeStr = now.getHours().toString().padStart(2,'0') + ':' + now.getMinutes().toString().padStart(2,'0');
+  const item = document.createElement('div');
+  item.className = `notif-feed-item ${type}`;
+  item.innerHTML = `<div class="feed-icon">${icon}</div><div><div class="feed-title">${title}</div><div class="feed-msg">${msg}</div></div><div class="feed-time">${timeStr}</div>`;
+  feed.insertBefore(item, feed.firstChild);
+  if (feed.children.length > 6) feed.lastChild.remove();
+}
+
+/* ════════════════════════════════════════
+   DEMO REQUEST BOARD
+════════════════════════════════════════ */
+let requests = [];
+let priority = 'low';
+let autoMode = false;
+let autoTimer = null;
+
+const AUTO_ITEMS = ['Chicken Breast','Mixed Greens','Cream Cheese','Tomatoes','Olive Oil','Butter','Eggs','Parmesan','Basil','Lemons','Heavy Cream','Breadcrumbs'];
+const AUTO_ROOMS = ['Bistro','Salad Room','Hot Kitchen','Cold Prep','Bakery'];
+const AUTO_UNITS = ['kg','lbs','cases','pcs','bags'];
+const PRIORITIES = ['low','low','med','high'];
+
+function setPriority(p, btn) {
+  priority = p;
+  document.querySelectorAll('.priority-btn').forEach(b => b.className = 'priority-btn');
+  btn.className = `priority-btn active-${p}`;
+}
+
+function toggleAuto() {
+  autoMode = !autoMode;
+  const toggle = document.getElementById('autoToggle');
+  toggle.classList.toggle('on', autoMode);
+  if (autoMode) {
+    autoTimer = setInterval(() => {
+      const item = AUTO_ITEMS[Math.floor(Math.random() * AUTO_ITEMS.length)];
+      const room = AUTO_ROOMS[Math.floor(Math.random() * AUTO_ROOMS.length)];
+      const qty = Math.floor(Math.random() * 10) + 1;
+      const unit = AUTO_UNITS[Math.floor(Math.random() * AUTO_UNITS.length)];
+      const pri = PRIORITIES[Math.floor(Math.random() * PRIORITIES.length)];
+      addRequest(item, room, qty, unit, pri);
+    }, 2800);
+  } else {
+    clearInterval(autoTimer);
+  }
+}
+
+function submitRequest() {
+  const item = document.getElementById('demoItem').value.trim() || 'Item';
+  const room = document.getElementById('demoRoom').value;
+  const qty = document.getElementById('demoQty').value || '1';
+  const unit = document.getElementById('demoUnit').value;
+  addRequest(item, room, qty, unit, priority);
+}
+
+function addRequest(item, room, qty, unit, pri) {
+  const id = Date.now() + Math.random();
+  const req = { id, item, room, qty, unit, priority: pri, createdAt: Date.now(), status: 'open', claimedBy: null };
+  requests.unshift(req);
+  renderPicklist();
+  showToast('info', '📝', 'New Request', `${room} needs ${qty} ${unit} ${item}`);
+}
+
+function claimRequest(id) {
+  const req = requests.find(r => r.id === id);
+  if (!req || req.status !== 'open') return;
+  req.status = 'claimed';
+  req.claimedBy = 'J. Martinez';
+  req.claimedAt = Date.now();
+  renderPicklist();
+  showToast('info', '🔒', 'Claimed', `${req.item} claimed by J. Martinez`);
+}
+
+function unclaimRequest(id) {
+  const req = requests.find(r => r.id === id);
+  if (!req || req.status !== 'claimed') return;
+  req.status = 'open';
+  req.claimedBy = null;
+  req.claimedAt = null;
+  renderPicklist();
+  showToast('info', '↩️', 'Unclaimed', `${req.item} returned to queue`);
+}
+
+function startRequest(id) {
+  const req = requests.find(r => r.id === id);
+  if (!req || req.status !== 'claimed') return;
+  req.status = 'pending';
+  req.startedAt = Date.now();
+  renderPicklist();
+  showToast('info', '🚶', 'In Progress', `${req.claimedBy} is delivering ${req.item}`);
+}
+
+function deliverRequest(id) {
+  const req = requests.find(r => r.id === id);
+  if (!req) return;
+  const card = document.querySelector(`[data-req-id="${id}"]`);
+  if (card) {
+    card.classList.add('delivered');
+    setTimeout(() => {
+      requests = requests.filter(r => r.id !== id);
+      renderPicklist();
+    }, 420);
+  }
+  showToast('success', '✅', 'Done!', `${req.qty} ${req.unit} ${req.item} → ${req.room}`);
+}
+
+function formatAge(ms) {
+  const s = Math.floor(ms / 1000);
+  const m = Math.floor(s / 60);
+  const ss = s % 60;
+  return `${m}m ${ss.toString().padStart(2,'0')}s`;
+}
+
+function getSLAClass(ms) {
+  const min = ms / 60000;
+  if (min >= 10) return 'sla-crit';
+  if (min >= 5) return 'sla-warn';
+  return '';
+}
+
+function statusSLAClass(req, age) {
+  if (req.status === 'claimed')  return 'sla-claimed';
+  if (req.status === 'pending')  return 'sla-pending';
+  return getSLAClass(age);
+}
+function statusAgeColor(req, age) {
+  if (req.status === 'claimed')  return 'var(--blue)';
+  if (req.status === 'pending')  return 'var(--yellow)';
+  const c = getSLAClass(age);
+  return c === 'sla-crit' ? 'var(--red)' : c === 'sla-warn' ? 'var(--yellow)' : 'var(--green)';
+}
+function buildButtons(req) {
+  if (req.status === 'open')
+    return `<button class="req-action" onclick="claimRequest(${req.id})">Claim</button>`;
+  if (req.status === 'claimed')
+    return `<button class="req-action btn-unclaim" onclick="unclaimRequest(${req.id})">Unclaim</button>
+            <button class="req-action btn-start"   onclick="startRequest(${req.id})">Start</button>`;
+  if (req.status === 'pending')
+    return `<button class="req-action btn-pending" disabled>Pending…</button>`;
+  return '';
+}
+
+function buildCard(req, age) {
+  const slaClass = statusSLAClass(req, age);
+  const ageColor = statusAgeColor(req, age);
+  const meta = req.claimedBy ? ` · 🔒 ${req.claimedBy}` : '';
+  const card = document.createElement('div');
+  card.className = `request-card ${slaClass}`;
+  card.dataset.reqId = req.id;
+  card.dataset.status = req.status;
+  card.innerHTML = `
+    <div class="req-info">
+      <div class="req-item">${req.item}</div>
+      <div class="req-meta">${req.room} · ${req.qty} ${req.unit}${meta}</div>
+    </div>
+    <span class="req-priority ${req.priority}">${req.priority}</span>
+    <div class="req-age" style="color:${ageColor}">${formatAge(age)}</div>
+    <div class="req-actions">${buildButtons(req)}</div>
+  `;
+  return card;
+}
+
+function renderPicklist() {
+  const container = document.getElementById('picklistCards');
+  const empty = document.getElementById('picklistEmpty');
+  const count = document.getElementById('picklistCount');
+  const open = requests.filter(r => r.status === 'open').length;
+  count.textContent = `${requests.length} request${requests.length !== 1 ? 's' : ''} • ${open} open`;
+  empty.style.display = requests.length === 0 ? 'block' : 'none';
+
+  // Build a map of current DOM cards
+  const existing = {};
+  container.querySelectorAll('[data-req-id]').forEach(el => { existing[el.dataset.reqId] = el; });
+
+  // Pass 1: update or create each card, collect the final ordered elements
+  const finalCards = requests.map(req => {
+    const age = Date.now() - req.createdAt;
+    const slaClass = statusSLAClass(req, age);
+    const ageColor = statusAgeColor(req, age);
+    const prevCard = existing[req.id];
+    const prevStatus = prevCard ? prevCard.dataset.status : null;
+
+    if (prevCard && prevStatus === req.status) {
+      // Patch in-place — no DOM rebuild needed
+      prevCard.classList.remove('sla-warn', 'sla-crit', 'sla-claimed', 'sla-pending');
+      if (slaClass) prevCard.classList.add(slaClass);
+      const ageEl = prevCard.querySelector('.req-age');
+      if (ageEl) { ageEl.textContent = formatAge(age); ageEl.style.color = ageColor; }
+      delete existing[req.id];
+      return prevCard;
+    } else {
+      // Status changed or new card — rebuild
+      if (prevCard) prevCard.remove();
+      delete existing[req.id];
+      return buildCard(req, age);
+    }
+  });
+
+  // Pass 2: remove cards no longer in the request list
+  Object.values(existing).forEach(el => el.remove());
+
+  // Pass 3: ensure DOM order matches, moving only out-of-place cards
+  finalCards.forEach((card, i) => {
+    const current = container.children[i];
+    if (current !== card) container.insertBefore(card, current || null);
+  });
+}
+
+setInterval(() => { if (requests.length > 0) renderPicklist(); }, 1000);
+
+// Seed the demo with live requests on load
+(function seedDemo() {
+  const now = Date.now();
+  const seeds = [
+    { item: 'Mixed Greens', room: 'Salad Room', qty: 3, unit: 'cases', pri: 'high', ago: 7 * 60000 },
+    { item: 'Chicken Breast', room: 'Bistro', qty: 5, unit: 'kg', pri: 'med', ago: 4 * 60000 },
+    { item: 'Olive Oil', room: 'Hot Kitchen', qty: 2, unit: 'bottles', pri: 'low', ago: 90000 },
+  ];
+  seeds.forEach(s => {
+    requests.push({ id: now - s.ago + Math.random(), item: s.item, room: s.room, qty: s.qty, unit: s.unit, priority: s.pri, createdAt: now - s.ago, status: 'open', claimedBy: null });
+  });
+  renderPicklist();
+})();
+
+/* ════════════════════════════════════════
+   AUTO DEMO SIMULATION
+════════════════════════════════════════ */
+const simPool = [
+  { item: 'Romaine Lettuce',   room: 'Salad Room',    qty: 4, unit: 'cases',   priority: 'high' },
+  { item: 'Beef Tenderloin',   room: 'Grill Station', qty: 3, unit: 'kg',      priority: 'high' },
+  { item: 'Salmon Fillet',     room: 'Bistro',        qty: 2, unit: 'kg',      priority: 'high' },
+  { item: 'Heavy Cream',       room: 'Pastry',        qty: 4, unit: 'L',       priority: 'med'  },
+  { item: 'Pasta Dough',       room: 'Hot Kitchen',   qty: 6, unit: 'lbs',     priority: 'med'  },
+  { item: 'Cream Cheese',      room: 'Cold Prep',     qty: 3, unit: 'lbs',     priority: 'med'  },
+  { item: 'Cherry Tomatoes',   room: 'Salad Room',    qty: 1, unit: 'case',    priority: 'low'  },
+  { item: 'Butter (unsalted)', room: 'Pastry',        qty: 5, unit: 'lbs',     priority: 'low'  },
+  { item: 'Garlic',            room: 'Hot Kitchen',   qty: 2, unit: 'heads',   priority: 'low'  },
+];
+const simNames = ['Alex T.', 'Jordan K.', 'Sam R.', 'Taylor M.', 'Riley P.'];
+let autoSimRunning = false;
+let autoSimTimeout = null;
+let simPoolIndex = 0;
+
+function toggleAutoSim() {
+  autoSimRunning ? stopAutoSim() : startAutoSim();
+}
+
+function startAutoSim() {
+  autoSimRunning = true;
+  const btn = document.getElementById('autoSimBtn');
+  if (btn) { btn.textContent = '⏸ Pause'; btn.classList.add('running'); }
+  simTick();
+}
+
+function stopAutoSim() {
+  autoSimRunning = false;
+  clearTimeout(autoSimTimeout);
+  const btn = document.getElementById('autoSimBtn');
+  if (btn) { btn.textContent = '▶ Watch Demo'; btn.classList.remove('running'); }
+}
+
+function simTick() {
+  if (!autoSimRunning) return;
+
+  const open    = requests.filter(r => r.status === 'open');
+  const claimed = requests.filter(r => r.status === 'claimed');
+  const pending = requests.filter(r => r.status === 'pending');
+
+  // State machine: open → claimed → pending → done
+  if (pending.length > 0 && Math.random() < 0.6) {
+    // Complete a pending delivery
+    const req = pending[Math.floor(Math.random() * pending.length)];
+    deliverRequest(req.id);
+    autoSimTimeout = setTimeout(simTick, 1600 + Math.random() * 800);
+  } else if (claimed.length > 0 && Math.random() < 0.65) {
+    // Start a claimed item (move to pending)
+    const req = claimed[Math.floor(Math.random() * claimed.length)];
+    startRequest(req.id);
+    autoSimTimeout = setTimeout(simTick, 1400 + Math.random() * 600);
+  } else if (open.length > 0) {
+    // Claim the highest-priority open request
+    const order = { high: 0, med: 1, low: 2 };
+    const top = [...open].sort((a, b) => order[a.priority] - order[b.priority])[0];
+    const worker = simNames[Math.floor(Math.random() * simNames.length)];
+    top.status = 'claimed';
+    top.claimedBy = worker;
+    top.claimedAt = Date.now();
+    renderPicklist();
+    showToast('info', '🔒', 'Claimed', `${top.item} claimed by ${worker}`);
+    autoSimTimeout = setTimeout(simTick, 2000 + Math.random() * 800);
+  } else {
+    // Board thin — add a new request
+    const tpl = simPool[simPoolIndex % simPool.length];
+    simPoolIndex++;
+    const req = { id: Date.now() + Math.random(), ...tpl, createdAt: Date.now(), status: 'open', claimedBy: null };
+    requests.push(req);
+    renderPicklist();
+    showToast('info', '📝', 'New Request', `${req.item} → ${req.room}`);
+    autoSimTimeout = setTimeout(simTick, 1000);
+  }
+
+  // Proactively refill so the board never looks empty
+  if (requests.filter(r => r.status === 'open').length < 1 && autoSimRunning) {
+    const tpl = simPool[simPoolIndex % simPool.length];
+    simPoolIndex++;
+    requests.push({ id: Date.now() + Math.random() + 1, ...tpl, createdAt: Date.now() - 45000, status: 'open', claimedBy: null });
+    renderPicklist();
+  }
+}
+
+/* ════════════════════════════════════════
+   FLOW STEP AUTO-CYCLE
+════════════════════════════════════════ */
+let currentStep = 0;
+const flowObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => {
+    if (e.isIntersecting) startFlowCycle();
+    else stopFlowCycle();
+  });
+}, { threshold: 0.3 });
+flowObserver.observe(document.getElementById('flowSteps'));
+
+let flowTimer;
+function startFlowCycle() {
+  stopFlowCycle();
+  flowTimer = setInterval(advanceStep, 2600);
+}
+function stopFlowCycle() { clearInterval(flowTimer); }
+function advanceStep() {
+  const steps = document.querySelectorAll('.flow-step');
+  steps[currentStep].classList.remove('active');
+  currentStep = (currentStep + 1) % steps.length;
+  steps[currentStep].classList.add('active');
+}
+document.querySelectorAll('.flow-step').forEach((step, i) => {
+  step.addEventListener('click', () => {
+    document.querySelectorAll('.flow-step').forEach(s => s.classList.remove('active'));
+    step.classList.add('active');
+    currentStep = i;
+    stopFlowCycle();
+    flowTimer = setTimeout(() => startFlowCycle(), 3000);
+  });
+});
+
+/* ════════════════════════════════════════
+   ROLE TOGGLE
+════════════════════════════════════════ */
+function toggleRole(card) {
+  const wasActive = card.classList.contains('active');
+  document.querySelectorAll('.role-card').forEach(c => c.classList.remove('active'));
+  if (!wasActive) card.classList.add('active');
+}
+
+
+/* ════════════════════════════════════════
+   CONTACT FORM
+════════════════════════════════════════ */
+function submitContact() {
+  const first = document.getElementById('cfFirst').value.trim();
+  const email = document.getElementById('cfEmail').value.trim();
+  const company = document.getElementById('cfCompany').value.trim();
+  if (!first || !email || !company) {
+    showToast('warn', '⚠️', 'Missing Fields', 'Please fill in your name, email, and company.');
+    return;
+  }
+  const btn = document.getElementById('cfBtn');
+  btn.textContent = 'Sending...';
+  btn.disabled = true;
+  setTimeout(() => {
+    document.getElementById('contactForm').style.display = 'none';
+    document.getElementById('contactSuccess').style.display = 'block';
+    showToast('success', '✅', 'Request Sent!', 'We\'ll be in touch shortly to schedule your demo.');
+  }, 900);
+}
+
+function updateSLAMock(val) {
+  const seconds = parseInt(val);
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  const card = document.getElementById('slaMockCard');
+  const ageEl = document.getElementById('slaMockAge');
+  const statusEl = document.getElementById('slaMockStatus');
+
+  ageEl.textContent = `${m}m ${s.toString().padStart(2,'0')}s`;
+
+  if (seconds < 300) {
+    card.className = 'sla-mock-request';
+    ageEl.style.color = 'var(--green)';
+    statusEl.textContent = '✓ On track — well within SLA';
+  } else if (seconds < 600) {
+    card.className = 'sla-mock-request warn';
+    ageEl.style.color = 'var(--yellow)';
+    statusEl.textContent = '⚠ Warning — approaching SLA threshold';
+  } else {
+    card.className = 'sla-mock-request crit';
+    ageEl.style.color = 'var(--red)';
+    statusEl.textContent = '🚨 Critical — SLA breached, immediate action needed';
+  }
+}
+</script>
+</body>
+</html>
